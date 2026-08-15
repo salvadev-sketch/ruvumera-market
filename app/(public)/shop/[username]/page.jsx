@@ -5,7 +5,6 @@ import { useEffect, useState } from "react"
 import { MailIcon, MapPinIcon } from "lucide-react"
 import Loading from "@/components/Loading"
 import Image from "next/image"
-import { dummyStoreData, productDummyData } from "@/assets/assets"
 
 export default function StoreShop() {
 
@@ -13,18 +12,41 @@ export default function StoreShop() {
     const [products, setProducts] = useState([])
     const [storeInfo, setStoreInfo] = useState(null)
     const [loading, setLoading] = useState(true)
+    const [notFound, setNotFound] = useState(false)
 
     const fetchStoreData = async () => {
-        setStoreInfo(dummyStoreData)
-        setProducts(productDummyData)
-        setLoading(false)
+        try {
+            const res = await fetch(`/api/stores/${username}`)
+            if (!res.ok) {
+                setNotFound(true)
+                setLoading(false)
+                return
+            }
+            const data = await res.json()
+            setStoreInfo(data.store)
+            setProducts(data.products)
+        } catch (error) {
+            setNotFound(true)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {
         fetchStoreData()
-    }, [])
+    }, [username])
 
-    return !loading ? (
+    if (loading) return <Loading />
+
+    if (notFound) {
+        return (
+            <div className="min-h-[70vh] flex items-center justify-center">
+                <p className="text-slate-500">Store not found.</p>
+            </div>
+        )
+    }
+
+    return (
         <div className="min-h-[70vh] mx-6">
 
             {/* Store Info Banner */}
@@ -50,7 +72,7 @@ export default function StoreShop() {
                                 <MailIcon className="w-4 h-4 text-gray-500 mr-2" />
                                 <span>{storeInfo.email}</span>
                             </div>
-                           
+
                         </div>
                     </div>
                 </div>
@@ -64,5 +86,5 @@ export default function StoreShop() {
                 </div>
             </div>
         </div>
-    ) : <Loading />
+    )
 }
