@@ -19,9 +19,45 @@ export default function CreateStore() {
         address: "",
         logo: ""
     })
+    const [logoFile, setLogoFile] = useState(null)
+    const [logoPreview, setLogoPreview] = useState("")
+    const [uploading, setUploading] = useState(false)
 
     const onChangeHandler = (e) => {
         setStoreInfo({ ...storeInfo, [e.target.name]: e.target.value })
+    }
+
+    const onLogoFileChange = (e) => {
+        const file = e.target.files?.[0]
+        if (!file) return
+        setLogoFile(file)
+        setLogoPreview(URL.createObjectURL(file))
+    }
+
+    const uploadLogo = async () => {
+        if (!logoFile) {
+            throw new Error("Please choose a logo image")
+        }
+        setUploading(true)
+        try {
+            const formData = new FormData()
+            formData.append("file", logoFile)
+
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+
+            const data = await res.json()
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to upload logo")
+            }
+
+            return data.url
+        } finally {
+            setUploading(false)
+        }
     }
 
     const fetchSellerStatus = async () => {
@@ -54,10 +90,13 @@ export default function CreateStore() {
     const onSubmitHandler = async (e) => {
         e.preventDefault()
 
+        const logoUrl = await uploadLogo()
+        const payload = { ...storeInfo, logo: logoUrl }
+
         const res = await fetch('/api/store/create', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(storeInfo)
+            body: JSON.stringify(payload)
         })
 
         const data = await res.json()
@@ -85,9 +124,12 @@ export default function CreateStore() {
                             <p className="max-w-lg">To become a seller on Ruvumera Market, submit your store details for review. Your store will be activated after admin verification.</p>
                         </div>
 
-                        <p>Logo URL</p>
-                        <input name="logo" onChange={onChangeHandler} value={storeInfo.logo} type="url" placeholder="https://example.com/your-logo.png" required className="border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded" />
-                        <p className="text-xs text-slate-400 -mt-2">Paste a link to your logo image for now (file upload coming later).</p>
+                        <p>Store Logo</p>
+                        <input onChange={onLogoFileChange} type="file" accept="image/*" required className="border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded" />
+                        {logoPreview && (
+                            <img src={logoPreview} alt="Logo preview" className="w-24 h-24 object-cover rounded border border-slate-200 mt-1" />
+                        )}
+                        <p className="text-xs text-slate-400 -mt-2">JPG, PNG or similar, up to 5MB.</p>
 
                         <p>Username</p>
                         <input name="username" onChange={onChangeHandler} value={storeInfo.username} type="text" placeholder="Enter your store username" required className="border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded" />
@@ -107,7 +149,7 @@ export default function CreateStore() {
                         <p>Address</p>
                         <textarea name="address" onChange={onChangeHandler} value={storeInfo.address} rows={5} placeholder="Enter your store address" required className="border border-slate-300 outline-slate-400 w-full max-w-lg p-2 rounded resize-none" />
 
-                        <button className="bg-slate-800 text-white px-12 py-2 rounded mt-10 mb-40 active:scale-95 hover:bg-slate-900 transition ">Submit</button>
+                        <button disabled={uploading} className="bg-slate-800 text-white px-12 py-2 rounded mt-10 mb-40 active:scale-95 hover:bg-slate-900 transition disabled:opacity-60">{uploading ? "Uploading..." : "Submit"}</button>
                     </form>
                 </div>
             ) : (

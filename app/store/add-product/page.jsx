@@ -1,80 +1,128 @@
 'use client'
-import { assets } from "@/assets/assets"
-import Image from "next/image"
 import { useState } from "react"
-import { toast } from "react-hot-toast"
+import toast from "react-hot-toast"
 
-export default function StoreAddProduct() {
+const CATEGORIES = ["Watch", "Earbuds", "Mouse", "Decoration", "Headphones", "Speakers"]
 
-    const categories = ['Electronics', 'Clothing', 'Home & Kitchen', 'Beauty & Health', 'Toys & Games', 'Sports & Outdoors', 'Books & Media', 'Food & Drink', 'Hobbies & Crafts', 'Others']
+export default function AddProduct() {
 
-    const [images, setImages] = useState({ 1: null, 2: null, 3: null, 4: null })
-    const [productInfo, setProductInfo] = useState({
+    const [form, setForm] = useState({
         name: "",
         description: "",
-        mrp: 0,
-        price: 0,
-        category: "",
+        mrp: "",
+        price: "",
+        category: CATEGORIES[0],
     })
-    const [loading, setLoading] = useState(false)
-
+    const [imageFiles, setImageFiles] = useState([])
+    const [imagePreviews, setImagePreviews] = useState([])
+    const [uploading, setUploading] = useState(false)
 
     const onChangeHandler = (e) => {
-        setProductInfo({ ...productInfo, [e.target.name]: e.target.value })
+        setForm({ ...form, [e.target.name]: e.target.value })
+    }
+
+    const onImagesChange = (e) => {
+        const files = Array.from(e.target.files || [])
+        if (files.length === 0) return
+        setImageFiles(files)
+        setImagePreviews(files.map(f => URL.createObjectURL(f)))
+    }
+
+    const uploadImages = async () => {
+        const urls = []
+        for (const file of imageFiles) {
+            const formData = new FormData()
+            formData.append("file", file)
+
+            const res = await fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            const data = await res.json()
+
+            if (!res.ok) {
+                throw new Error(data.error || `Failed to upload ${file.name}`)
+            }
+            urls.push(data.url)
+        }
+        return urls
     }
 
     const onSubmitHandler = async (e) => {
         e.preventDefault()
-        // Logic to add a product
-        
+
+        if (imageFiles.length === 0) {
+            throw new Error("Please add at least one product image")
+        }
+
+        setUploading(true)
+        try {
+            const images = await uploadImages()
+
+            const res = await fetch('/api/store/product', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...form, images })
+            })
+            const data = await res.json()
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to add product")
+            }
+
+            setForm({ name: "", description: "", mrp: "", price: "", category: CATEGORIES[0] })
+            setImageFiles([])
+            setImagePreviews([])
+        } finally {
+            setUploading(false)
+        }
     }
 
-
     return (
-        <form onSubmit={e => toast.promise(onSubmitHandler(e), { loading: "Adding Product..." })} className="text-slate-500 mb-28">
-            <h1 className="text-2xl">Add New <span className="text-slate-800 font-medium">Products</span></h1>
-            <p className="mt-7">Product Images</p>
+        <div className="mx-6 min-h-[70vh] my-16">
+            <form
+                onSubmit={e => toast.promise(onSubmitHandler(e), { loading: "Adding product...", success: "Product added!", error: (err) => err.message })}
+                className="max-w-lg flex flex-col gap-3 text-slate-500"
+            >
+                <h1 className="text-3xl">Add <span className="text-slate-800 font-medium">Product</span></h1>
 
-            <div htmlFor="" className="flex gap-3 mt-4">
-                {Object.keys(images).map((key) => (
-                    <label key={key} htmlFor={`images${key}`}>
-                        <Image width={300} height={300} className='h-15 w-auto border border-slate-200 rounded cursor-pointer' src={images[key] ? URL.createObjectURL(images[key]) : assets.upload_area} alt="" />
-                        <input type="file" accept='image/*' id={`images${key}`} onChange={e => setImages({ ...images, [key]: e.target.files[0] })} hidden />
-                    </label>
-                ))}
-            </div>
+                <p>Product Images</p>
+                <input onChange={onImagesChange} type="file" accept="image/*" multiple required className="border border-slate-300 outline-slate-400 w-full p-2 rounded" />
+                {imagePreviews.length > 0 && (
+                    <div className="flex gap-2 flex-wrap">
+                        {imagePreviews.map((src, i) => (
+                            <img key={i} src={src} alt={`Preview ${i + 1}`} className="w-20 h-20 object-cover rounded border border-slate-200" />
+                        ))}
+                    </div>
+                )}
+                <p className="text-xs text-slate-400 -mt-2">You can select multiple images. JPG, PNG or similar, up to 5MB each.</p>
 
-            <label htmlFor="" className="flex flex-col gap-2 my-6 ">
-                Name
-                <input type="text" name="name" onChange={onChangeHandler} value={productInfo.name} placeholder="Enter product name" className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded" required />
-            </label>
+                <p>Name</p>
+                <input name="name" onChange={onChangeHandler} value={form.name} type="text" placeholder="Enter product name" required className="border border-slate-300 outline-slate-400 w-full p-2 rounded" />
 
-            <label htmlFor="" className="flex flex-col gap-2 my-6 ">
-                Description
-                <textarea name="description" onChange={onChangeHandler} value={productInfo.description} placeholder="Enter product description" rows={5} className="w-full max-w-sm p-2 px-4 outline-none border border-slate-200 rounded resize-none" required />
-            </label>
+                <p>Description</p>
+                <textarea name="description" onChange={onChangeHandler} value={form.description} rows={4} placeholder="Enter product description" required className="border border-slate-300 outline-slate-400 w-full p-2 rounded resize-none" />
 
-            <div className="flex gap-5">
-                <label htmlFor="" className="flex flex-col gap-2 ">
-                    Actual Price ($)
-                    <input type="number" name="mrp" onChange={onChangeHandler} value={productInfo.mrp} placeholder="0" rows={5} className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded resize-none" required />
-                </label>
-                <label htmlFor="" className="flex flex-col gap-2 ">
-                    Offer Price ($)
-                    <input type="number" name="price" onChange={onChangeHandler} value={productInfo.price} placeholder="0" rows={5} className="w-full max-w-45 p-2 px-4 outline-none border border-slate-200 rounded resize-none" required />
-                </label>
-            </div>
+                <div className="flex gap-3">
+                    <div className="flex-1">
+                        <p>Actual Price (MRP)</p>
+                        <input name="mrp" onChange={onChangeHandler} value={form.mrp} type="number" min="0" step="0.01" placeholder="0.00" required className="border border-slate-300 outline-slate-400 w-full p-2 rounded" />
+                    </div>
+                    <div className="flex-1">
+                        <p>Offer Price</p>
+                        <input name="price" onChange={onChangeHandler} value={form.price} type="number" min="0" step="0.01" placeholder="0.00" required className="border border-slate-300 outline-slate-400 w-full p-2 rounded" />
+                    </div>
+                </div>
 
-            <select onChange={e => setProductInfo({ ...productInfo, category: e.target.value })} value={productInfo.category} className="w-full max-w-sm p-2 px-4 my-6 outline-none border border-slate-200 rounded" required>
-                <option value="">Select a category</option>
-                {categories.map((category) => (
-                    <option key={category} value={category}>{category}</option>
-                ))}
-            </select>
+                <p>Category</p>
+                <select name="category" onChange={onChangeHandler} value={form.category} className="border border-slate-300 outline-slate-400 w-full p-2 rounded">
+                    {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
 
-            <br />
-
-            <button disabled={loading} className="bg-slate-800 text-white px-6 mt-7 py-2 hover:bg-slate-900 rounded transition">Add Product</button>
-        </form>
+                <button disabled={uploading} className="bg-slate-800 text-white px-12 py-2 rounded mt-6 mb-20 active:scale-95 hover:bg-slate-900 transition disabled:opacity-60">
+                    {uploading ? "Uploading..." : "Add Product"}
+                </button>
+            </form>
+        </div>
     )
 }
