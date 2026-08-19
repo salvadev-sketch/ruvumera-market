@@ -12,8 +12,15 @@ const AdminLayout = ({ children }) => {
     const [loading, setLoading] = useState(true)
 
     const fetchIsAdmin = async () => {
-        setIsAdmin(true)
-        setLoading(false)
+        try {
+            const res = await fetch('/api/admin/check')
+            const data = await res.json()
+            setIsAdmin(Boolean(data.isAdmin))
+        } catch (error) {
+            setIsAdmin(false)
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {
