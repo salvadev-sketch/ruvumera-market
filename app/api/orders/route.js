@@ -15,9 +15,35 @@ async function ensureUserRow(user) {
     });
 }
 
+// Re-validates a coupon server-side at order time — never trusts a
+// discount amount computed on the client. Mirrors the checks in
+// /api/coupons/apply so a coupon can't go stale between "Apply" and
+// "Place Order".
+async function validateCoupon(code, userId) {
+    if (!code) return null;
+
+    const normalizedCode = code.trim().toUpperCase();
+    const coupon = await prisma.coupon.findUnique({ where: { code: normalizedCode } });
+
+    if (!coupon) throw new Error("Invalid coupon code");
+    if (coupon.expiresAt < new Date()) throw new Error("This coupon has expired");
+
+    if (coupon.forNewUser) {
+        const priorOrderCount = await prisma.order.count({ where: { userId } });
+        if (priorOrderCount > 0) throw new Error("This coupon is only valid for new customers");
+    }
+
+    if (coupon.forMember) {
+        throw new Error("This coupon requires a membership, which isn't available yet");
+    }
+
+    return coupon;
+}
+
 // Cart items come in as [{ productId, quantity }]. A multi-vendor cart can span
 // several stores, so this splits it into one Order per store, each with its own
-// OrderItems and total, all created in a single transaction.
+// OrderItems and total, all created in a single transaction. If a coupon is
+// applied, the same percentage discount is applied to each store's subtotal.
 export async function POST(request) {
     try {
         const user = await currentUser();
@@ -27,7 +53,7 @@ export async function POST(request) {
         }
 
         const body = await request.json();
-        const { items, addressId, paymentMethod } = body;
+        const { items, addressId, paymentMethod, couponCode } = body;
 
         if (!Array.isArray(items) || items.length === 0) {
             return NextResponse.json({ error: "Cart is empty" }, { status: 400 });
@@ -43,6 +69,15 @@ export async function POST(request) {
         }
 
         await ensureUserRow(user);
+
+        let coupon = null;
+        if (couponCode) {
+            try {
+                coupon = await validateCoupon(couponCode, user.id);
+            } catch (err) {
+                return NextResponse.json({ error: err.message }, { status: 400 });
+            }
+        }
 
         const address = await prisma.address.findUnique({ where: { id: addressId } });
         if (!address || address.userId !== user.id) {
@@ -75,7 +110,8 @@ export async function POST(request) {
 
         const orders = await prisma.$transaction(
             Object.entries(byStore).map(([storeId, storeItems]) => {
-                const total = storeItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+                const subtotal = storeItems.reduce((sum, i) => sum + i.product.price * i.quantity, 0);
+                const total = coupon ? +(subtotal * (1 - coupon.discount / 100)).toFixed(2) : subtotal;
 
                 return prisma.order.create({
                     data: {
@@ -84,6 +120,8 @@ export async function POST(request) {
                         addressId,
                         total,
                         paymentMethod,
+                        isCouponUsed: Boolean(coupon),
+                        coupon: coupon ? { code: coupon.code, discount: coupon.discount, description: coupon.description } : {},
                         orderItems: {
                             create: storeItems.map((i) => ({
                                 productId: i.product.id,

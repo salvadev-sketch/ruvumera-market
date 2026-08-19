@@ -3,7 +3,6 @@ import { useEffect, useState } from "react"
 import { format } from "date-fns"
 import toast from "react-hot-toast"
 import { DeleteIcon } from "lucide-react"
-import { couponDummyData } from "@/assets/assets"
 
 export default function AdminCoupons() {
 
@@ -20,24 +19,61 @@ export default function AdminCoupons() {
     })
 
     const fetchCoupons = async () => {
-        setCoupons(couponDummyData)
+        try {
+            const res = await fetch('/api/admin/coupons')
+            const data = await res.json()
+            if (res.ok) {
+                setCoupons(data.coupons)
+            } else {
+                toast.error(data.error || "Failed to load coupons")
+            }
+        } catch (error) {
+            toast.error("Failed to load coupons")
+        }
     }
 
     const handleAddCoupon = async (e) => {
         e.preventDefault()
-        // Logic to add a coupon
 
+        const res = await fetch('/api/admin/coupons', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newCoupon)
+        })
+        const data = await res.json()
 
+        if (!res.ok) {
+            throw new Error(data.error || "Failed to add coupon")
+        }
+
+        setCoupons(prev => [data.coupon, ...prev])
+        setNewCoupon({
+            code: '',
+            description: '',
+            discount: '',
+            forNewUser: false,
+            forMember: false,
+            isPublic: false,
+            expiresAt: new Date()
+        })
     }
 
     const handleChange = (e) => {
-        setNewCoupon({ ...newCoupon, [e.target.name]: e.target.value })
+        const { name, value } = e.target
+        // Keep expiresAt as a real Date object so date-fns format() below
+        // doesn't choke on a raw yyyy-MM-dd string after the first edit.
+        setNewCoupon({ ...newCoupon, [name]: name === 'expiresAt' ? new Date(value) : value })
     }
 
     const deleteCoupon = async (code) => {
-        // Logic to delete a coupon
+        const res = await fetch(`/api/admin/coupons/${code}`, { method: 'DELETE' })
+        const data = await res.json()
 
+        if (!res.ok) {
+            throw new Error(data.error || "Failed to delete coupon")
+        }
 
+        setCoupons(prev => prev.filter(c => c.code !== code))
     }
 
     useEffect(() => {
@@ -48,7 +84,7 @@ export default function AdminCoupons() {
         <div className="text-slate-500 mb-40">
 
             {/* Add Coupon */}
-            <form onSubmit={(e) => toast.promise(handleAddCoupon(e), { loading: "Adding coupon..." })} className="max-w-sm text-sm">
+            <form onSubmit={(e) => toast.promise(handleAddCoupon(e), { loading: "Adding coupon...", success: "Coupon added!", error: (err) => err.message })} className="max-w-sm text-sm">
                 <h2 className="text-2xl">Add <span className="text-slate-800 font-medium">Coupons</span></h2>
                 <div className="flex gap-2 max-sm:flex-col mt-2">
                     <input type="text" placeholder="Coupon Code" className="w-full mt-2 p-2 border border-slate-200 outline-slate-400 rounded-md"
@@ -92,6 +128,7 @@ export default function AdminCoupons() {
                         </label>
                         <p>For Member</p>
                     </div>
+                    <p className="text-xs text-slate-400 mt-2 max-w-xs">Note: "For Member" coupons can be created but can't be redeemed yet — there's no membership system in the app.</p>
                 </div>
                 <button className="mt-4 p-2 px-10 rounded bg-slate-700 text-white active:scale-95 transition">Add Coupon</button>
             </form>
@@ -118,11 +155,11 @@ export default function AdminCoupons() {
                                     <td className="py-3 px-4 font-medium text-slate-800">{coupon.code}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.description}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.discount}%</td>
-                                    <td className="py-3 px-4 text-slate-800">{format(coupon.expiresAt, 'yyyy-MM-dd')}</td>
+                                    <td className="py-3 px-4 text-slate-800">{format(new Date(coupon.expiresAt), 'yyyy-MM-dd')}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.forNewUser ? 'Yes' : 'No'}</td>
                                     <td className="py-3 px-4 text-slate-800">{coupon.forMember ? 'Yes' : 'No'}</td>
                                     <td className="py-3 px-4 text-slate-800">
-                                        <DeleteIcon onClick={() => toast.promise(deleteCoupon(coupon.code), { loading: "Deleting coupon..." })} className="w-5 h-5 text-red-500 hover:text-red-800 cursor-pointer" />
+                                        <DeleteIcon onClick={() => toast.promise(deleteCoupon(coupon.code), { loading: "Deleting coupon...", success: "Coupon deleted", error: (err) => err.message })} className="w-5 h-5 text-red-500 hover:text-red-800 cursor-pointer" />
                                     </td>
                                 </tr>
                             ))}

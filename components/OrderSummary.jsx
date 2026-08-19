@@ -39,7 +39,20 @@ const OrderSummary = ({ totalPrice, items }) => {
 
     const handleCouponCode = async (event) => {
         event.preventDefault();
-        
+
+        const res = await fetch('/api/coupons/apply', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: couponCodeInput })
+        });
+        const data = await res.json();
+
+        if (!res.ok) {
+            throw new Error(data.error || "Failed to apply coupon");
+        }
+
+        setCoupon(data.coupon);
+        setCouponCodeInput('');
     }
 
     const handlePlaceOrder = async (e) => {
@@ -56,6 +69,7 @@ const OrderSummary = ({ totalPrice, items }) => {
                 items: items.map(item => ({ productId: item.id, quantity: item.quantity })),
                 addressId: selectedAddress.id,
                 paymentMethod,
+                couponCode: coupon ? coupon.code : undefined,
             })
         });
         const data = await res.json();
@@ -122,7 +136,7 @@ const OrderSummary = ({ totalPrice, items }) => {
                 </div>
                 {
                     !coupon ? (
-                        <form onSubmit={e => toast.promise(handleCouponCode(e), { loading: 'Checking Coupon...' })} className='flex justify-center gap-3 mt-3'>
+                        <form onSubmit={e => toast.promise(handleCouponCode(e), { loading: 'Checking Coupon...', success: 'Coupon applied!', error: (err) => err.message })} className='flex justify-center gap-3 mt-3'>
                             <input onChange={(e) => setCouponCodeInput(e.target.value)} value={couponCodeInput} type="text" placeholder='Coupon Code' className='border border-slate-400 p-1.5 rounded w-full outline-none' />
                             <button className='bg-slate-600 text-white px-3 rounded hover:bg-slate-800 active:scale-95 transition-all'>Apply</button>
                         </form>
