@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from "react"
 import Loading from "@/components/Loading"
-import { orderDummyData } from "@/assets/assets"
+import toast from "react-hot-toast"
 
 export default function StoreOrders() {
     const [orders, setOrders] = useState([])
@@ -11,14 +11,35 @@ export default function StoreOrders() {
 
 
     const fetchOrders = async () => {
-       setOrders(orderDummyData)
-       setLoading(false)
+        try {
+            const res = await fetch('/api/store/orders')
+            const data = await res.json()
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to load orders")
+            }
+            setOrders(data.orders)
+        } catch (error) {
+            toast.error(error.message)
+        } finally {
+            setLoading(false)
+        }
     }
 
     const updateOrderStatus = async (orderId, status) => {
-        // Logic to update the status of an order
-
-
+        try {
+            const res = await fetch('/api/store/orders', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ orderId, status })
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to update order")
+            }
+            setOrders(prev => prev.map(o => o.id === orderId ? data.order : o))
+        } catch (error) {
+            toast.error(error.message)
+        }
     }
 
     const openModal = (order) => {
