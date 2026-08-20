@@ -1,10 +1,10 @@
 'use client'
-import { dummyStoreDashboardData } from "@/assets/assets"
 import Loading from "@/components/Loading"
 import { CircleDollarSignIcon, ShoppingBasketIcon, StarIcon, TagsIcon } from "lucide-react"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
 import { useEffect, useState } from "react"
+import toast from "react-hot-toast"
 
 export default function Dashboard() {
 
@@ -14,6 +14,8 @@ export default function Dashboard() {
 
     const [loading, setLoading] = useState(true)
     const [dashboardData, setDashboardData] = useState({
+        // NOTE: totalProducts/totalEarnings/totalOrders are not wired to
+        // real data yet — only ratings were in scope for this pass.
         totalProducts: 0,
         totalEarnings: 0,
         totalOrders: 0,
@@ -28,8 +30,19 @@ export default function Dashboard() {
     ]
 
     const fetchDashboardData = async () => {
-        setDashboardData(dummyStoreDashboardData)
-        setLoading(false)
+        try {
+            const res = await fetch('/api/store/ratings')
+            const data = await res.json()
+            if (res.ok) {
+                setDashboardData(prev => ({ ...prev, ratings: data.ratings }))
+            } else {
+                toast.error(data.error || "Failed to load ratings")
+            }
+        } catch (error) {
+            toast.error("Failed to load dashboard data")
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {
@@ -59,6 +72,11 @@ export default function Dashboard() {
             <h2>Total Reviews</h2>
 
             <div className="mt-5">
+                {
+                    dashboardData.ratings.length === 0 && (
+                        <p className="text-slate-400 text-sm">No reviews yet.</p>
+                    )
+                }
                 {
                     dashboardData.ratings.map((review, index) => (
                         <div key={index} className="flex max-sm:flex-col gap-5 sm:items-center justify-between py-6 border-b border-slate-200 text-sm text-slate-600 max-w-4xl">

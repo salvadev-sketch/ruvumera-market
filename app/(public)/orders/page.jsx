@@ -4,11 +4,14 @@ import { useEffect, useState } from "react";
 import OrderItem from "@/components/OrderItem";
 import Loading from "@/components/Loading";
 import toast from "react-hot-toast";
+import { useDispatch } from "react-redux";
+import { fetchRatings } from "@/lib/features/rating/ratingSlice";
 
 export default function Orders() {
 
     const [orders, setOrders] = useState([]);
     const [loading, setLoading] = useState(true);
+    const dispatch = useDispatch();
 
     useEffect(() => {
         const fetchOrders = async () => {
@@ -26,7 +29,8 @@ export default function Orders() {
             }
         };
         fetchOrders();
-    }, []);
+        dispatch(fetchRatings());
+    }, [dispatch]);
 
     if (loading) return <Loading />;
 
