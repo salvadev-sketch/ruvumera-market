@@ -14,8 +14,6 @@ export default function Dashboard() {
 
     const [loading, setLoading] = useState(true)
     const [dashboardData, setDashboardData] = useState({
-        // NOTE: totalProducts/totalEarnings/totalOrders are not wired to
-        // real data yet — only ratings were in scope for this pass.
         totalProducts: 0,
         totalEarnings: 0,
         totalOrders: 0,
@@ -31,12 +29,12 @@ export default function Dashboard() {
 
     const fetchDashboardData = async () => {
         try {
-            const res = await fetch('/api/store/ratings')
+            const res = await fetch('/api/store/dashboard')
             const data = await res.json()
             if (res.ok) {
-                setDashboardData(prev => ({ ...prev, ratings: data.ratings }))
+                setDashboardData(data)
             } else {
-                toast.error(data.error || "Failed to load ratings")
+                toast.error(data.error || "Failed to load dashboard data")
             }
         } catch (error) {
             toast.error("Failed to load dashboard data")

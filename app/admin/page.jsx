@@ -1,9 +1,9 @@
 'use client'
-import { dummyAdminDashboardData } from "@/assets/assets"
 import Loading from "@/components/Loading"
 import OrdersAreaChart from "@/components/OrdersAreaChart"
 import { CircleDollarSignIcon, ShoppingBasketIcon, StoreIcon, TagsIcon } from "lucide-react"
 import { useEffect, useState } from "react"
+import toast from "react-hot-toast"
 
 export default function AdminDashboard() {
 
@@ -26,8 +26,19 @@ export default function AdminDashboard() {
     ]
 
     const fetchDashboardData = async () => {
-        setDashboardData(dummyAdminDashboardData)
-        setLoading(false)
+        try {
+            const res = await fetch('/api/admin/dashboard')
+            const data = await res.json()
+            if (res.ok) {
+                setDashboardData(data)
+            } else {
+                toast.error(data.error || "Failed to load dashboard data")
+            }
+        } catch (error) {
+            toast.error("Failed to load dashboard data")
+        } finally {
+            setLoading(false)
+        }
     }
 
     useEffect(() => {
